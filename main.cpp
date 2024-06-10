@@ -10,8 +10,7 @@ enum commands {
     PRINT = 5,
     INSERT_BY_INDEX = 6,
     SEARCH = 7,
-    CLEAR = 8,
-    EXIT = 9
+    EXIT = 8
 };
 
 void commandPrompt() {
@@ -24,8 +23,7 @@ void commandPrompt() {
            "5 - Print text to console.\n"
            "6 - Insert text by line and index.\n"
            "7 - Search the text.\n"
-           "8 - Clear console.\n"
-           "9 - Exit the program.\n");
+           "8 - Exit the program.\n");
 
 }
 
@@ -127,14 +125,13 @@ void loadFromFile() {
         return;
     }
     char buffer[1000];
-    if (fgets(buffer, sizeof(buffer), fileLoad) != NULL) {
-        printf("Text successfully loaded from %s:\n %s\n", filename, buffer);
-    } else {
-        printf("Error reading file content\n");
+
+    printf("Text successfully loaded from %s:\n", filename);
+    while (fgets(buffer, sizeof(buffer), fileLoad) != NULL) {
+        printf("%s\n", buffer);
     }
 
     fclose(fileLoad);
-    printf("The load was successfully done.\n");
 }
 
 void printText() {
@@ -145,16 +142,162 @@ void printText() {
     }
 }
 
-void insertByIndex() {
+void insertByIndex(const char *filename, int line, int index, char *textToInsert) {
+    printf("Enter filename: ");
+    scanf("%s", filename);
 
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Error opening file.");
+        return;
+    }
+
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char *buffer = (char *)malloc(fileSize + 1);
+    if (!buffer) {
+        printf("Memory allocation failed.");
+        fclose(file);
+        return;
+    }
+
+    fread(buffer, 1, fileSize, file);
+    buffer[fileSize] = '\0';
+    fclose(file);
+
+    printf("Enter line number: ");
+    scanf("%d", &line);
+
+    int currentLine = 1;
+    int charCount = 0;
+    while (currentLine < line && buffer[charCount] != '\0') {
+        if (buffer[charCount] == '\n') {
+            currentLine++;
+        }
+        charCount++;
+    }
+
+    if (currentLine < line) {
+        printf("Error! This line number exceeds the number of lines in the file.\n");
+        free(buffer);
+        return;
+    }
+
+    int lineStart = charCount;
+    while (buffer[charCount] != '\n' && buffer[charCount] != '\0') {
+        charCount++;
+    }
+    int lineLength = charCount - lineStart;
+
+    printf("Enter index: ");
+    scanf("%d", &index);
+
+    if (index > lineLength) {
+        printf("Error! This index exceeds the length of the line.\n");
+        free(buffer);
+        return;
+    }
+
+    printf("Enter text to insert: ");
+    getchar();
+    fgets(textToInsert, sizeof(textToInsert), stdin);
+    textToInsert[strcspn(textToInsert, "\n")] = '\0';
+
+    size_t newSize = fileSize + strlen(textToInsert);
+    char *newBuffer = (char *)malloc(newSize + 1);
+    if (!newBuffer) {
+        printf("Memory allocation failed.");
+        free(buffer);
+        return;
+    }
+
+    strncpy(newBuffer, buffer, lineStart + index);
+    newBuffer[lineStart + index] = '\0';
+    strcat(newBuffer, textToInsert);
+    strcat(newBuffer, buffer + lineStart + index);
+
+    file = fopen(filename, "w");
+    if (!file) {
+        printf("Error opening file for writing.");
+        free(buffer);
+        free(newBuffer);
+        return;
+    }
+    fwrite(newBuffer, 1, newSize, file);
+    fclose(file);
+
+    free(buffer);
+    allInputs = (char *)realloc(allInputs, newSize + 1);
+    if (!allInputs) {
+        printf("Memory allocation failed.\n");
+        free(newBuffer);
+        return;
+    }
+    strcpy(allInputs, newBuffer);
+    free(newBuffer);
+
+    printf("Text successfully inserted into %s at line %d, index %d\n", filename, line, index);
 }
 
 void searchText() {
+    char filename[256];
+    char searchText[256];
 
-}
+    printf("Enter filename: ");
+    scanf("%s", filename);
 
-void clearConsole() {
+    printf("Enter text to search: ");
+    getchar();
+    fgets(searchText, sizeof(searchText), stdin);
+    searchText[strcspn(searchText, "\n")] = '\0';
 
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Error opening file.");
+        return;
+    }
+
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char *buffer = (char *)malloc(fileSize + 1);
+    if (!buffer) {
+        printf("Memory allocation failed.");
+        fclose(file);
+        return;
+    }
+
+    fread(buffer, 1, fileSize, file);
+    buffer[fileSize] = '\0';
+    fclose(file);
+
+    int searchTextLen = strlen(searchText);
+    int found = 0;
+    int line = 1;
+    int column = 1;
+
+    for (char *pos = buffer; *pos != '\0'; ++pos) {
+        if (strncmp(pos, searchText, searchTextLen) == 0) {
+            found = 1;
+            printf("Text '%s' found at line %d, index %d.\n", searchText, line, column);
+        }
+
+        if (*pos == '\n') {
+            line++;
+            column = 1;
+        } else {
+            column++;
+        }
+    }
+
+    if (!found) {
+        printf("Text '%s' not found in the file.\n", searchText);
+    }
+
+    free(buffer);
 }
 
 void getCommand(int command) {
@@ -178,13 +321,14 @@ void getCommand(int command) {
             printText();
             break;
         case INSERT_BY_INDEX:
-            printf("Command has not been implemented yet.\n");
+            char filename[256];
+            int line, index;
+            char textToInsert[256];
+
+            insertByIndex(filename, line, index, textToInsert);
             break;
         case SEARCH:
-            printf("Command has not been implemented yet.\n");
-            break;
-        case CLEAR:
-            printf("Command has not been implemented yet.\n");
+            searchText();
             break;
         case EXIT:
             printf("Exiting the program...\n");
