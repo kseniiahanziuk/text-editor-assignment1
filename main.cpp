@@ -10,7 +10,14 @@ enum commands {
     PRINT = 5,
     INSERT_BY_INDEX = 6,
     SEARCH = 7,
-    EXIT = 8
+    DELETE = 8,
+    UNDO = 9,
+    REDO = 10,
+    CUT = 11,
+    COPY = 12,
+    PASTE = 13,
+    INSERT_WITH_REPLACEMENT = 14,
+    EXIT = 15
 };
 
 void commandPrompt() {
@@ -23,7 +30,13 @@ void commandPrompt() {
            "5 - Print text to console.\n"
            "6 - Insert text by line and index.\n"
            "7 - Search the text.\n"
-           "8 - Exit the program.\n");
+           "8 - Delete text by line, index and number of symbols.\n"
+           "9 - Undo a command.\n"
+           "10 - Redo a command.\n"
+           "11 - Cut the text.\n"
+           "12 - Copy the text.\n"
+           "13 - Paste the text.\n"
+           "14 - Exit the program.\n");
 
 }
 
@@ -300,6 +313,87 @@ void searchText() {
     free(buffer);
 }
 
+void deleteText() {
+    int line, index, length;
+    printf("Choose the line: ");
+    scanf("%d", &line);
+
+    printf("Choose the index: ");
+    scanf("%d", &index);
+
+    printf("Choose the number of symbols to delete: ");
+    scanf("%d", &length);
+
+    if (!allInputs) {
+        printf("There is no text to delete from.\n");
+        return;
+    }
+
+    int currentLine = 1;
+    int charCount = 0;
+    while (currentLine < line && allInputs[charCount] != '\0') {
+        if (allInputs[charCount] == '\n') {
+            currentLine++;
+        }
+        charCount++;
+    }
+
+    if (currentLine < line) {
+        printf("Error! This line number exceeds the number of lines in the text.\n");
+        return;
+    }
+
+    int lineStart = charCount;
+    while (allInputs[charCount] != '\n' && allInputs[charCount] != '\0') {
+        charCount++;
+    }
+    int lineLength = charCount - lineStart;
+
+    if (index > lineLength) {
+        printf("Error! This index exceeds the length of the line.\n");
+        return;
+    }
+
+    if (index + length > lineLength) {
+        length = lineLength - index;
+    }
+
+    int i = lineStart + index;
+    while (allInputs[i + length] != '\0') {
+        allInputs[i] = allInputs[i + length];
+        i++;
+    }
+    allInputs[i] = '\0';
+
+    printf("Text successfully deleted from line %d, index %d, length %d\n", line, index, length);
+}
+
+void undoCommand() {
+
+}
+
+void redoCommand() {
+
+}
+
+void cutText() {
+
+}
+
+void copyText() {
+
+}
+
+void pasteText() {
+
+}
+
+void insertWithReplacement() {
+
+}
+
+
+
 void getCommand(int command) {
     switch (command) {
         case HELP:
@@ -330,11 +424,32 @@ void getCommand(int command) {
         case SEARCH:
             searchText();
             break;
+        case DELETE:
+            deleteText();
+            break;
+        case UNDO:
+            printf("The command has not been implemented yet.");
+            break;
+        case REDO:
+            printf("The command has not been implemented yet.");
+            break;
+        case CUT:
+            printf("The command has not been implemented yet.");
+            break;
+        case COPY:
+            printf("The command has not been implemented yet.");
+            break;
+        case PASTE:
+            printf("The command has not been implemented yet.");
+            break;
+        case INSERT_WITH_REPLACEMENT:
+            printf("The command has not been implemented yet.");
+            break;
         case EXIT:
             printf("Exiting the program...\n");
             break;
         default:
-            printf("Oops! Write a correct command from 0 to 9.\n");
+            printf("Oops! Write a correct command from 0 to 15.\n");
     }
 }
 
