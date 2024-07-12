@@ -25,6 +25,7 @@ size_t bufferInput = 128;
 char filename[50];
 char *undoBuffer = NULL;
 char *redoBuffer = NULL;
+char *clipboardBuffer = NULL;
 
 void commandPrompt() {
     printf("\nChoose what option do you want to use:\n"
@@ -448,22 +449,191 @@ void redoCommand() {
 }
 
 void cutText() {
+    saveState();
+    int line, index, length;
+    printf("Choose the line: ");
+    scanf("%d", &line);
 
+    printf("Choose the index: ");
+    scanf("%d", &index);
+
+    printf("Choose the number of symbols to cut: ");
+    scanf("%d", &length);
+
+    if (!allInputs) {
+        printf("There is no text to cut from.\n");
+        return;
+    }
+
+    int currentLine = 1;
+    int charCount = 0;
+    while (currentLine < line && allInputs[charCount] != '\0') {
+        if (allInputs[charCount] == '\n') {
+            currentLine++;
+        }
+        charCount++;
+    }
+
+    if (currentLine < line) {
+        printf("Error! This line number exceeds the number of lines in the text.\n");
+        return;
+    }
+
+    int lineStart = charCount;
+    while (allInputs[charCount] != '\n' && allInputs[charCount] != '\0') {
+        charCount++;
+    }
+    int lineLength = charCount - lineStart;
+
+    if (index > lineLength) {
+        printf("Error! This index exceeds the length of the line.\n");
+        return;
+    }
+
+    if (index + length > lineLength) {
+        length = lineLength - index;
+    }
+
+    clipboardBuffer = (char *)malloc((length + 1) * sizeof(char));
+    if (!clipboardBuffer) {
+        printf("Memory allocation failed for clipboard.\n");
+        return;
+    }
+    strncpy(clipboardBuffer, &allInputs[lineStart + index], length);
+    clipboardBuffer[length] = '\0';
+
+    int i = lineStart + index;
+    while (allInputs[i + length] != '\0') {
+        allInputs[i] = allInputs[i + length];
+        i++;
+    }
+    allInputs[i] = '\0';
+
+    printf("Text successfully cut from line %d, index %d, length %d\n", line, index, length);
 }
 
 void copyText() {
+    int line, index, length;
+    printf("Choose the line: ");
+    scanf("%d", &line);
 
+    printf("Choose the index: ");
+    scanf("%d", &index);
+
+    printf("Choose the number of symbols to copy: ");
+    scanf("%d", &length);
+
+    if (!allInputs) {
+        printf("There is no text to copy from.\n");
+        return;
+    }
+
+    int currentLine = 1;
+    int charCount = 0;
+    while (currentLine < line && allInputs[charCount] != '\0') {
+        if (allInputs[charCount] == '\n') {
+            currentLine++;
+        }
+        charCount++;
+    }
+
+    if (currentLine < line) {
+        printf("Error! This line number exceeds the number of lines in the text.\n");
+        return;
+    }
+
+    int lineStart = charCount;
+    while (allInputs[charCount] != '\n' && allInputs[charCount] != '\0') {
+        charCount++;
+    }
+    int lineLength = charCount - lineStart;
+
+    if (index > lineLength) {
+        printf("Error! This index exceeds the length of the line.\n");
+        return;
+    }
+
+    if (index + length > lineLength) {
+        length = lineLength - index;
+    }
+
+    clipboardBuffer = (char *)malloc((length + 1) * sizeof(char));
+    if (!clipboardBuffer) {
+        printf("Memory allocation failed for clipboard.\n");
+        return;
+    }
+    strncpy(clipboardBuffer, &allInputs[lineStart + index], length);
+    clipboardBuffer[length] = '\0';
+
+    printf("Text successfully copied from line %d, index %d, length %d\n", line, index, length);
 }
 
 void pasteText() {
+    saveState();
+    int line, index;
+    printf("Choose the line: ");
+    scanf("%d", &line);
 
+    printf("Choose the index: ");
+    scanf("%d", &index);
+
+    if (!clipboardBuffer) {
+        printf("Clipboard is empty.\n");
+        return;
+    }
+
+    if (!allInputs) {
+        printf("There is no text to paste into.\n");
+        return;
+    }
+
+    int currentLine = 1;
+    int charCount = 0;
+    while (currentLine < line && allInputs[charCount] != '\0') {
+        if (allInputs[charCount] == '\n') {
+            currentLine++;
+        }
+        charCount++;
+    }
+
+    if (currentLine < line) {
+        printf("Error! This line number exceeds the number of lines in the text.\n");
+        return;
+    }
+
+    int lineStart = charCount;
+    while (allInputs[charCount] != '\n' && allInputs[charCount] != '\0') {
+        charCount++;
+    }
+    int lineLength = charCount - lineStart;
+
+    if (index > lineLength) {
+        printf("Error! This index exceeds the length of the line.\n");
+        return;
+    }
+
+    size_t clipboardLength = strlen(clipboardBuffer);
+    size_t newSize = strlen(allInputs) + clipboardLength + 1;
+    char *newBuffer = (char *)malloc(newSize * sizeof(char));
+    if (!newBuffer) {
+        printf("Memory allocation failed.\n");
+        return;
+    }
+
+    strncpy(newBuffer, allInputs, lineStart + index);
+    newBuffer[lineStart + index] = '\0';
+    strcat(newBuffer, clipboardBuffer);
+    strcat(newBuffer, &allInputs[lineStart + index]);
+
+    free(allInputs);
+    allInputs = newBuffer;
+
+    printf("Text has been successfully pasted at line %d, index %d\n", line, index);
 }
 
 void insertWithReplacement() {
 
 }
-
-
 
 void getCommand(int command) {
     switch (command) {
@@ -505,13 +675,13 @@ void getCommand(int command) {
             redoCommand();
             break;
         case CUT:
-            printf("The command has not been implemented yet.");
+            cutText();
             break;
         case COPY:
-            printf("The command has not been implemented yet.");
+            copyText();
             break;
         case PASTE:
-            printf("The command has not been implemented yet.");
+            pasteText();
             break;
         case INSERT_WITH_REPLACEMENT:
             printf("The command has not been implemented yet.");
