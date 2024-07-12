@@ -20,6 +20,12 @@ enum commands {
     EXIT = 15
 };
 
+char *allInputs = NULL;
+size_t bufferInput = 128;
+char filename[50];
+char *undoBuffer = NULL;
+char *redoBuffer = NULL;
+
 void commandPrompt() {
     printf("\nChoose what option do you want to use:\n"
            "0 - Help.\n"
@@ -36,12 +42,9 @@ void commandPrompt() {
            "11 - Cut the text.\n"
            "12 - Copy the text.\n"
            "13 - Paste the text.\n"
-           "14 - Exit the program.\n");
-
+           "14 - Insert with replacement.\n"
+           "15 - Exit the program.\n");
 }
-
-char *allInputs = NULL;
-size_t bufferInput = 128;
 
 void commandValidation(int *command) {
     printf("\nEnter the command you want to use: ");
@@ -50,13 +53,33 @@ void commandValidation(int *command) {
             printf("Your command is: %d\n", *command);
             break;
         }
-        printf("Invalid input! Enter a number from 0 to 9: ");
+        printf("Invalid input! Enter a number from 0 to 15: ");
         while (getchar() != '\n');
     }
     while (getchar() != '\n');
 }
 
+void saveState() {
+    if (allInputs) {
+        if (undoBuffer) {
+            free(undoBuffer);
+        }
+        undoBuffer = (char *)malloc((strlen(allInputs) + 1) * sizeof(char));
+        if (undoBuffer) {
+            strcpy(undoBuffer, allInputs);
+        } else {
+            printf("Memory allocation failed for undo buffer.\n");
+        }
+    } else {
+        if (undoBuffer) {
+            free(undoBuffer);
+        }
+        undoBuffer = NULL;
+    }
+}
+
 void appendText() {
+    saveState();
     printf("Enter the text you want to append: ");
     size_t capacity = bufferInput;
     char *userInput = (char *)malloc(capacity * sizeof(char));
@@ -99,6 +122,7 @@ void appendText() {
 }
 
 void newLine(){
+    saveState();
     bufferInput *= 2;
 
     allInputs = (char *) realloc(allInputs, bufferInput * sizeof(char));
@@ -110,9 +134,8 @@ void newLine(){
     printf("The new line has been started.\n");
 }
 
-char filename[50];
-
 void saveToFile() {
+    saveState();
     FILE* file;
     printf("Enter the name of the file for saving: ");
     scanf("%s", filename);
@@ -156,6 +179,7 @@ void printText() {
 }
 
 void insertByIndex(const char *filename, int line, int index, char *textToInsert) {
+    saveState();
     printf("Enter filename: ");
     scanf("%s", filename);
 
@@ -314,6 +338,7 @@ void searchText() {
 }
 
 void deleteText() {
+    saveState();
     int line, index, length;
     printf("Choose the line: ");
     scanf("%d", &line);
@@ -369,11 +394,57 @@ void deleteText() {
 }
 
 void undoCommand() {
+    if (undoBuffer) {
+        if (redoBuffer) {
+            free(redoBuffer);
+        }
+        redoBuffer = (char *)malloc((allInputs ? strlen(allInputs) : 0) + 1);
+        if (redoBuffer) {
+            if (allInputs) {
+                strcpy(redoBuffer, allInputs);
+            } else {
+                redoBuffer[0] = '\0';
+            }
+        } else {
+            printf("Memory allocation failed for redo buffer.\n");
+            return;
+        }
 
+        if (allInputs) {
+            free(allInputs);
+        }
+        allInputs = (char *)malloc((strlen(undoBuffer) + 1) * sizeof(char));
+        if (allInputs) {
+            strcpy(allInputs, undoBuffer);
+            printf("Undo has been successful.\n");
+        } else {
+            printf("Memory allocation failed for undo operation.\n");
+        }
+        free(undoBuffer);
+        undoBuffer = NULL;
+    } else {
+        printf("No commands to undo.\n");
+    }
 }
 
 void redoCommand() {
-
+    if (redoBuffer) {
+        saveState();
+        if (allInputs) {
+            free(allInputs);
+        }
+        allInputs = (char *)malloc((strlen(redoBuffer) + 1) * sizeof(char));
+        if (allInputs) {
+            strcpy(allInputs, redoBuffer);
+            printf("Redo has been successful.\n");
+        } else {
+            printf("Memory allocation failed for redo operation.\n");
+        }
+        free(redoBuffer);
+        redoBuffer = NULL;
+    } else {
+        printf("No commands to redo.\n");
+    }
 }
 
 void cutText() {
@@ -428,10 +499,10 @@ void getCommand(int command) {
             deleteText();
             break;
         case UNDO:
-            printf("The command has not been implemented yet.");
+            undoCommand();
             break;
         case REDO:
-            printf("The command has not been implemented yet.");
+            redoCommand();
             break;
         case CUT:
             printf("The command has not been implemented yet.");
