@@ -1,5 +1,9 @@
 #include <iostream>
 #include <cstdlib>
+#include <dlfcn.h>
+#include <cstring>
+
+using namespace std;
 
 enum commands {
     HELP = 0,
@@ -16,7 +20,9 @@ enum commands {
     CUT = 11,
     COPY = 12,
     PASTE = 13,
-    EXIT = 14
+    ENCRYPT = 14,
+    DECRYPT = 15,
+    EXIT = 16
 };
 
 char *allInputs = NULL;
@@ -44,7 +50,9 @@ public:
                "11 - Cut the text.\n"
                "12 - Copy the text.\n"
                "13 - Paste the text.\n"
-               "14 - Exit the program.\n");
+               "14 - Encrypt by Caesar Cipher.\n"
+               "15 - Decrypt by Caesar Cipher.\n"
+               "16 - Exit the program.\n");
     }
 
     static void commandValidation(int *command) {
@@ -146,7 +154,7 @@ public:
         }
     }
 
-    static void insertByIndex(const char *filename, int line, int index, char *textToInsert) {
+    static void insertByIndex(char *filename, int line, int index, char *textToInsert) {
         saveState();
         printf("Enter filename: ");
         scanf("%s", filename);
@@ -637,11 +645,108 @@ public:
     }
 };
 
+class caesarCipher {
+private:
+    void *handle;
+    typedef char* (*encrypt_func)(char*, int);
+    typedef char* (*decrypt_func)(char*, int);
+
+    encrypt_func encrypt;
+    decrypt_func decrypt;
+
+    void closeLibrary() {
+        if (handle) {
+            dlclose(handle);
+            handle = NULL;
+        }
+    }
+
+    void loadLibrary() {
+        handle = dlopen("/Users/ksenia/CLionProjects/text-editor-assignment1/libcaesar.dylib", RTLD_LAZY);
+        if (handle == NULL) {
+            throw runtime_error("Failed to load library: " + string(dlerror()));
+        }
+
+        encrypt = (encrypt_func) dlsym(handle, "Encrypt");
+        decrypt = (decrypt_func) dlsym(handle, "Decrypt");
+
+        const char *error = dlerror();
+        if (error) {
+            closeLibrary();
+            throw runtime_error("Failed to load functions: " + string(error));
+        }
+
+        if (!encrypt || !decrypt) {
+            closeLibrary();
+            throw runtime_error("Encrypt or Decrypt function not found.");
+        }
+    }
+
+public:
+    caesarCipher() : handle(NULL), encrypt(NULL), decrypt(NULL) {
+        try {
+            loadLibrary();
+        } catch (const runtime_error& e) {
+            cerr << e.what() << endl;
+        }
+    }
+
+    ~caesarCipher() {
+        closeLibrary();
+    }
+
+    void Encrypt(char *text, int key) {
+        if (encrypt) {
+            char *encrypted = encrypt(text, key);
+            strcpy(text, encrypted);
+            free(encrypted);
+        } else {
+            throw runtime_error("Encrypt function not loaded.");
+        }
+    }
+
+    void Decrypt(char *text, int key) {
+        if (decrypt) {
+            char *decrypted = decrypt(text, key);
+            strcpy(text, decrypted);
+            free(decrypted);
+        } else {
+            throw runtime_error("Decrypt function not loaded.");
+        }
+    }
+
+    void EncryptText(char *text) {
+        if (text == NULL) {
+            printf("There is no text to encrypt.\n");
+            return;
+        }
+        int key;
+        cout << "Enter the key for encryption: ";
+        cin >> key;
+        cin.ignore();
+        Encrypt(text, key);
+        cout << "Text has been successfully encrypted.\n" << endl;
+    }
+
+    void DecryptText(char *text) {
+        if (text == NULL) {
+            printf("There is no text to decrypt.\n");
+            return;
+        }
+        int key;
+        cout << "Enter the key for decryption: ";
+        cin >> key;
+        cin.ignore();
+        Decrypt(text, key);
+        cout << "Text has been successfully decrypted.\n" << endl;
+    }
+};
 
 int main() {
     TextEditor editor;
     fileHandler file;
     commandHandler commands;
+    caesarCipher caesar;
     int command;
     commands.commandPrompt();
     do {
@@ -692,6 +797,12 @@ int main() {
                 break;
                 case PASTE:
                     editor.pasteText();
+                break;
+                case ENCRYPT:
+                    caesar.EncryptText(allInputs);
+                break;
+                case DECRYPT:
+                    caesar.DecryptText(allInputs);
                 break;
                 case EXIT:
                     printf("Exiting the program...\n");
