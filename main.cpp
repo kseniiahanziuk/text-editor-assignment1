@@ -22,7 +22,9 @@ enum commands {
     PASTE = 13,
     ENCRYPT = 14,
     DECRYPT = 15,
-    EXIT = 16
+    ENCRYPT_FILE = 16,
+    DECRYPT_FILE = 17,
+    EXIT = 18
 };
 
 char *allInputs = NULL;
@@ -52,7 +54,9 @@ public:
                "13 - Paste the text.\n"
                "14 - Encrypt by Caesar Cipher.\n"
                "15 - Decrypt by Caesar Cipher.\n"
-               "16 - Exit the program.\n");
+               "16 - Encrypt file by Caesar Cipher.\n"
+               "17 - Decrypt file by Caesar Cipher.\n"
+               "18 - Exit the program.\n");
     }
 
     static void commandValidation(int *command) {
@@ -62,7 +66,7 @@ public:
                 printf("Your command is: %d\n", *command);
                 break;
             }
-            printf("Invalid input! Enter a number from 0 to 14: ");
+            printf("Invalid input! Enter a number from 0 to 18: ");
             while (getchar() != '\n');
         }
         while (getchar() != '\n');
@@ -646,7 +650,7 @@ public:
 };
 
 class caesarCipher {
-private:
+public:
     void *handle;
     typedef char* (*encrypt_func)(char*, int);
     typedef char* (*decrypt_func)(char*, int);
@@ -682,7 +686,6 @@ private:
         }
     }
 
-public:
     caesarCipher() : handle(NULL), encrypt(NULL), decrypt(NULL) {
         try {
             loadLibrary();
@@ -740,6 +743,137 @@ public:
         Decrypt(text, key);
         cout << "Text has been successfully decrypted.\n" << endl;
     }
+
+    void EncryptChunk(char *text, int key, size_t chunkSize) {
+        char *encrypted = encrypt(text, key);
+        strncpy(text, encrypted, 128);
+        free(encrypted);
+        encrypted = NULL;
+    }
+
+    void DecryptChunk(char *text, int key, size_t chunkSize) {
+        char *decrypted = decrypt(text, key);
+        strncpy(text, decrypted, 128);
+        free(decrypted);
+        decrypted = NULL;
+    }
+};
+
+class caesarFiles {
+private:
+    bool saveToFile(char *filePath, char *content, long size) {
+        FILE *file = fopen(filePath, "ab");
+        if (!file) {
+            cout << "Error opening file " << filePath << endl;
+            return false;
+        }
+
+        if (fwrite(content, 1, size, file) != size) {
+            cout << "Error writing to file " << filePath << endl;
+            fclose(file);
+            return false;
+        }
+        fclose(file);
+        cout << "Saved chunk of size " << size << " bytes to " << filePath << endl;
+        return true;
+    }
+
+    void processFile(char *inputFilePath, char *outputFilePath, int key, bool encrypt) {
+        try {
+            caesarCipher cipher;
+            cipher.loadLibrary();
+
+            const int chunk_size = 128;
+            char buffer[chunk_size];
+
+            bool useTemp = strcmp(inputFilePath, outputFilePath) == 0;
+            FILE *inputFile = fopen(inputFilePath, "rb");
+            if (!inputFile) {
+                throw runtime_error("Error opening input file.");
+            }
+
+            char tempPath[128];
+            if (useTemp) {
+                snprintf(tempPath, sizeof(tempPath), "%s.tmp", outputFilePath);
+            }
+            size_t bytesRead;
+            int chunkIndex = 0;
+            while ((bytesRead = fread(buffer, 1, chunk_size, inputFile)) > 0) {
+                if (encrypt) {
+                    cipher.EncryptChunk(buffer, key, 128);
+                } else {
+                    cipher.DecryptChunk(buffer, key, 128);
+                }
+
+                if (useTemp) {
+                    if (!saveToFile(tempPath, buffer, bytesRead)) {
+                        fclose(inputFile);
+                        throw runtime_error("Error writing to output file.");
+                    }
+                } else {
+                    if (!saveToFile(outputFilePath, buffer, bytesRead)) {
+                        fclose(inputFile);
+                        throw runtime_error("Error writing to output file.");
+                    }
+                }
+                cout << "Processed chunk " << ++chunkIndex << ", size: " << bytesRead << " bytes." << endl;
+            }
+
+            fclose(inputFile);
+
+            if (useTemp) {
+                if (remove(outputFilePath) != 0) {
+                    throw runtime_error("Error removing original file.");
+                }
+                if (rename(tempPath, outputFilePath) != 0) {
+                    throw runtime_error("Error renaming temporary file.");
+                }
+            }
+
+            if (encrypt) {
+                cout << "File encrypted and saved as " << outputFilePath << endl;
+            } else {
+                cout << "File decrypted and saved as " << outputFilePath << endl;
+            }
+
+            cipher.closeLibrary();
+        } catch (const runtime_error &e) {
+            cerr << "File processing error: " << e.what() << endl;
+        }
+    }
+
+public:
+    void EncryptFile() {
+        char inputFile[256];
+        char outputFile[256];
+        cout << "Enter input file path: ";
+        cin >> inputFile;
+        cin.ignore();
+        cout << "Enter output file path: ";
+        cin >> outputFile;
+        cin.ignore();
+        int key;
+        cout << "Enter the key for encryption: ";
+        cin >> key;
+        cin.ignore();
+        processFile(inputFile, outputFile, key, true);
+    }
+
+    void DecryptFile() {
+        char inputFile[256];
+        char outputFile[256];
+        cout << "Enter input file path: ";
+        cin >> inputFile;
+        cin.ignore();
+        cout << "Enter output file path: ";
+        cin >> outputFile;
+        cin.ignore();
+        int key;
+        cout << "Enter the key for decryption: ";
+        cin >> key;
+        cin.ignore();
+        processFile(inputFile, outputFile, key, false);
+    }
 };
 
 int main() {
@@ -747,6 +881,7 @@ int main() {
     fileHandler file;
     commandHandler commands;
     caesarCipher caesar;
+    caesarFiles caesarfiles;
     int command;
     commands.commandPrompt();
     do {
@@ -804,11 +939,17 @@ int main() {
                 case DECRYPT:
                     caesar.DecryptText(allInputs);
                 break;
+                case ENCRYPT_FILE:
+                    caesarfiles.EncryptFile();
+                break;
+                case DECRYPT_FILE:
+                    caesarfiles.DecryptFile();
+                break;
                 case EXIT:
                     printf("Exiting the program...\n");
                 break;
                 default:
-                    printf("Oops! Write a correct command from 0 to 14.\n");
+                    printf("Oops! Write a correct command from 0 to 18.\n");
             }
     } while (command != EXIT);
 
